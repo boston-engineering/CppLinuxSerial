@@ -680,5 +680,9 @@ namespace CppLinuxSerial {
       return state_;
     }
 
+    std::string SerialPort::GetDeviceName() {
+        return device_;
+    }
+
 } // namespace CppLinuxSerial
 } // namespace mn

@@ -205,6 +205,8 @@ namespace mn {
             /// \brief          Get the raw File Descriptor for IOCTL calls
             int GetFileDescriptor();
 
+            std::string GetDeviceName();
+
         private:
 
             /// \brief      Configures the tty device as a serial port.
