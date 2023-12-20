@@ -198,6 +198,9 @@ namespace mn {
             /// \returns        The state of the serial port
             State GetState();
 
+            /// \brief          Get the raw File Descriptor for IOCTL calls
+            int GetFileDescriptor();
+
         private:
 
             /// \brief      Configures the tty device as a serial port.

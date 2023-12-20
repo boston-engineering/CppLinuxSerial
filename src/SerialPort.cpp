@@ -128,6 +128,10 @@ namespace CppLinuxSerial {
             ConfigureTermios();
     }
 
+    int SerialPort::GetFileDescriptor(){
+        return fileDesc_;
+    }
+
     void SerialPort::Open()
     {
         if(device_.empty()) {
