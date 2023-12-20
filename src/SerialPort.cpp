@@ -156,6 +156,18 @@ namespace CppLinuxSerial {
         state_ = State::OPEN;
     }
 
+    bool SerialPort::Flush()
+    {
+        PortIsOpened(__PRETTY_FUNCTION__);
+
+        if(tcflush(fileDesc_, TCIFLUSH) != 0) {
+            return false;
+        }
+        
+        readBuffer_.clear();
+        return true;
+    }
+
     void SerialPort::SetEcho(bool value) {
         echo_ = value;
         ConfigureTermios();

@@ -161,6 +161,10 @@ namespace mn {
             /// \note       Must call this before you can configure the COM port.
             void Open();
 
+            /// \brief      Flushes the serial port of any data, and clears the read buffer
+            /// \returns    If the flush was successful
+            bool Flush();
+
             /// \brief      Closes the COM port.
             void Close();
 
