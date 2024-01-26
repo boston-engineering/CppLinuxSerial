@@ -64,7 +64,7 @@ namespace mn {
             B_CUSTOM, // Placeholder
         };
 
-        /// \brief      Enumeration of all the valid num. of data bits. Must align with the options 
+        /// \brief      Enumeration of all the valid num. of data bits. Must align with the options
         ///                 provided in termbits.h, i.e. CS5, CS6, CS7 and CS8.
         enum class NumDataBits {
             FIVE,
@@ -116,7 +116,7 @@ namespace mn {
             SerialPort(const std::string &device, BaudRate baudRate, NumDataBits numDataBits, Parity parity, NumStopBits numStopBits);
 
             /// \brief      Constructor that sets up serial port and allows the user to specify all the common parameters and flow control.
-            SerialPort(const std::string &device, BaudRate baudRate, NumDataBits numDataBits, Parity parity, 
+            SerialPort(const std::string &device, BaudRate baudRate, NumDataBits numDataBits, Parity parity,
                 NumStopBits numStopBits, HardwareFlowControl hardwareFlowControl, SoftwareFlowControl softwareFlowControl);
 
             /// \brief      Constructor that sets up serial port with the basic parameters, and a custom baud rate.
@@ -177,10 +177,19 @@ namespace mn {
             /// \brief      Use to read text from the COM port. Blocking nature depends on SetTimeout().
             /// \param      data        The read characters from the COM port will be appended to this string.
             /// \note       Use ReadBinary() if you want to interpret received data as binary.
-            /// \throws     
+            /// \throws
             ///             CppLinuxSerial::Exception if state != OPEN.
             ///             std::system_error() if device has been disconnected.
             void Read(std::string& data);
+
+            /// \brief      Use to read binary data from the COM port. Blocking nature depends on SetTimeout().
+            /// \param      data        The read bytes from the COM port will be appended to this vector.
+            /// \param      num_bytes   The number of bytes to read
+            /// \param      timeout_ms  Max ms to wait for num_bytes, default 100
+            /// \note       Use Read() if you want to interpret received data as a string.
+            /// \throws     CppLinuxSerial::Exception if state != OPEN.
+            ///             std::system_error() if device has been disconnected.
+            void ReadBytes(std::vector<uint8_t>& data, size_t num_bytes, uint32_t timeout_ms=defaultReadBytesTimeout_ms_);
 
             /// \brief      Use to read binary data from the COM port. Blocking nature depends on SetTimeout().
             /// \param      data        The read bytes from the COM port will be appended to this vector.
@@ -252,14 +261,15 @@ namespace mn {
 
             bool echo_;
 
-            int32_t timeout_ms_;
+            int32_t vtime_ms_;
 
             std::vector<char> readBuffer_;
             unsigned char readBufferSize_B_;
 
             static constexpr BaudRate defaultBaudRate_ = BaudRate::B_57600;
-            static constexpr int32_t defaultTimeout_ms_ = -1;
+            static constexpr int32_t defaultVtime_ms_ = -1;
             static constexpr unsigned char defaultReadBufferSize_B_ = 255;
+            static constexpr uint32_t defaultReadBytesTimeout_ms_ = 100;
 
         };
 

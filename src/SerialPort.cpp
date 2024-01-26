@@ -29,6 +29,8 @@
 #include "CppLinuxSerial/Exception.hpp"
 #include "CppLinuxSerial/SerialPort.hpp"
 
+#include <chrono>
+
 #define    BOTHER 0010000
 
 namespace mn {
@@ -36,7 +38,7 @@ namespace CppLinuxSerial {
 
     SerialPort::SerialPort() {
         echo_ = false;
-        timeout_ms_ = defaultTimeout_ms_;
+        vtime_ms_ = defaultVtime_ms_;
         baudRateType_ = BaudRateType::STANDARD;
         baudRateStandard_ = defaultBaudRate_;
         readBufferSize_B_ = defaultReadBufferSize_B_;
@@ -185,14 +187,14 @@ namespace CppLinuxSerial {
             default:
                 THROW_EXCEPT("numDataBits_ value not supported!");
         }
-        
+
         // Set parity
         // See https://man7.org/linux/man-pages/man3/tcflush.3.html
         switch(parity_) {
             case Parity::NONE:
                 tty.c_cflag     &=  ~PARENB;
                 break;
-            case Parity::EVEN:	
+            case Parity::EVEN:
                 tty.c_cflag 	|=   PARENB;
                 tty.c_cflag		&=	 ~PARODD; // Clearing PARODD makes the parity even
                 break;
@@ -421,17 +423,17 @@ namespace CppLinuxSerial {
         // c_cc[WMIN] sets the number of characters to block (wait) for when read() is called.
         // Set to 0 if you don't want read to block. Only meaningful when port set to non-canonical mode
 
-        if(timeout_ms_ == -1) {
+        if(vtime_ms_ == -1) {
             // Always wait for at least one byte, this could
             // block indefinitely
             tty.c_cc[VTIME] = 0;
             tty.c_cc[VMIN] = 1;
-        } else if(timeout_ms_ == 0) {
+        } else if(vtime_ms_ == 0) {
             // Setting both to 0 will give a non-blocking read
             tty.c_cc[VTIME] = 0;
             tty.c_cc[VMIN] = 0;
-        } else if(timeout_ms_ > 0) {
-            tty.c_cc[VTIME] = (cc_t)(timeout_ms_/100);    // 0.5 seconds read timeout
+        } else if(vtime_ms_ > 0) {
+            tty.c_cc[VTIME] = (cc_t)(vtime_ms_/100);    // 0.5 seconds read timeout
             tty.c_cc[VMIN] = 0;
         }
 
@@ -446,7 +448,7 @@ namespace CppLinuxSerial {
                 tty.c_iflag |= (IXON | IXOFF | IXANY);
             break;
         }
-        
+
         tty.c_iflag 	&= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
 
         //=========================== LOCAL MODES (c_lflag) =======================//
@@ -533,6 +535,49 @@ namespace CppLinuxSerial {
         }
 
         // If code reaches here, read must of been successful
+    }
+
+    void SerialPort::ReadBytes(std::vector<uint8_t>& data, size_t num_bytes, uint32_t timeout_ms) {
+        using namespace std::chrono;
+
+        PortIsOpened(__PRETTY_FUNCTION__);
+        auto bytes_read = 0;
+        const auto start = high_resolution_clock::now();
+
+        while(bytes_read < num_bytes && duration_cast<milliseconds>(high_resolution_clock::now() - start).count() < timeout_ms)
+        {
+            const auto bytes_remaining = num_bytes - bytes_read;
+            // Read from file
+            // We provide the underlying raw array from the readBuffer_ vector to this C api.
+            // This will work because we do not delete/resize the vector while this method
+            // is called
+            const ssize_t n = read(fileDesc_, &readBuffer_[bytes_read], bytes_remaining);
+
+            // Error Handling
+            if(n < 0) {
+                // Read was unsuccessful
+                throw std::system_error(EFAULT, std::system_category());
+            }
+            if(n == 0) {
+                // n == 0 means EOS, but also returned on device disconnection. We try to get termios2 to distinguish two these two states
+                termios2 term2;
+
+                if(const int rv = ioctl(fileDesc_, TCGETS2, &term2); rv != 0) {
+                    throw std::system_error(EFAULT, std::system_category());
+                }
+                break;
+            }
+
+            bytes_read += n;
+        }
+
+        // Must have read data we weren't supposed to read
+        if(bytes_read != num_bytes)
+        {
+            throw std::system_error(EFAULT, std::system_category());
+        }
+        // If code reaches here, read must have been successful
+        std::copy_n(readBuffer_.begin(), num_bytes, back_inserter(data));
     }
 
     void SerialPort::ReadBinary(std::vector<uint8_t>& data) {
@@ -649,16 +694,16 @@ namespace CppLinuxSerial {
             THROW_EXCEPT(std::string() + "timeout_ms provided to " + __PRETTY_FUNCTION__ + " was > 25500, which is invalid.");
         if(state_ == State::OPEN)
             THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ + " called while state == OPEN.");
-        timeout_ms_ = timeout_ms;
+        vtime_ms_ = timeout_ms;
     }
-    
+
     int32_t SerialPort::Available() {
         PortIsOpened(__PRETTY_FUNCTION__);
 
         int32_t ret = 0;
         ioctl(fileDesc_, FIONREAD, &ret);
         return ret;
-        
+
     }
     State SerialPort::GetState() {
       return state_;
