@@ -559,12 +559,13 @@ namespace CppLinuxSerial {
         using namespace std::chrono;
 
         PortIsOpened(__PRETTY_FUNCTION__);
-        auto bytes_read = 0;
+        ssize_t bytes_read = 0;
         const auto start = high_resolution_clock::now();
 
         while(bytes_read < num_bytes && duration_cast<milliseconds>(high_resolution_clock::now() - start).count() < timeout_ms)
         {
             const auto bytes_remaining = num_bytes - bytes_read;
+            // std::cout << "Trying to read " << std::to_string(bytes_remaining) << " bytes" << std::endl;
             // Read from file
             // We provide the underlying raw array from the readBuffer_ vector to this C api.
             // This will work because we do not delete/resize the vector while this method
@@ -574,24 +575,29 @@ namespace CppLinuxSerial {
             // Error Handling
             if(n < 0) {
                 // Read was unsuccessful
+                std::cout << "Unsuccessful read: " << std::to_string(n) << std::endl;
                 throw std::system_error(EFAULT, std::system_category());
             }
-            if(n == 0) {
-                // n == 0 means EOS, but also returned on device disconnection. We try to get termios2 to distinguish two these two states
-                termios2 term2;
+            bytes_read += n;
+        }
 
-                if(const int rv = ioctl(fileDesc_, TCGETS2, &term2); rv != 0) {
-                    throw std::system_error(EFAULT, std::system_category());
-                }
-                break;
+        if(bytes_read == 0) {
+            // n == 0 means EOS, but also returned on device disconnection. We try to get termios2 to distinguish two these two states
+            termios2 term2;
+
+            if(const int rv = ioctl(fileDesc_, TCGETS2, &term2); rv != 0) {
+                std::cout << "Disconnect: " << std::to_string(rv) << std::endl;
+                throw std::system_error(EFAULT, std::system_category());
             }
 
-            bytes_read += n;
+            std::cout << "No bytes" << std::endl;
+            return;
         }
 
         // Must have read data we weren't supposed to read
         if(bytes_read != num_bytes)
         {
+            std::cout << "Incomplete: " << std::to_string(bytes_read) << std::endl;
             throw std::system_error(EFAULT, std::system_category());
         }
         // If code reaches here, read must have been successful
