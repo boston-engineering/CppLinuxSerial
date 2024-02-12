@@ -38,6 +38,20 @@ namespace tios
 namespace mn {
 namespace CppLinuxSerial {
 
+class SerialException final : public std::exception
+{
+public:
+    explicit SerialException(const char* reason) :
+        _reason(reason)
+    {
+    }
+
+    [[nodiscard]] const char* what() const noexcept override { return _reason; }
+
+private:
+    const char* _reason;
+};
+
     SerialPort::SerialPort() {
         echo_ = false;
         vtime_ms_ = defaultVtime_ms_;
@@ -510,7 +524,8 @@ namespace CppLinuxSerial {
 
         // Check status
         if (writeResult == -1) {
-            throw std::system_error(EFAULT, std::system_category());
+            std::string msg = "Failed to write to serial port -- " + std::string(strerror(errno));
+            throw SerialException(msg.c_str());
         }
     }
 
@@ -521,7 +536,8 @@ namespace CppLinuxSerial {
 
         // Check status
         if (writeResult == -1) {
-            throw std::system_error(EFAULT, std::system_category());
+            std::string msg = "Failed to write to serial port -- " + std::string(strerror(errno));
+            throw SerialException(msg.c_str());
         }
     }
 
@@ -537,7 +553,7 @@ namespace CppLinuxSerial {
         // Error Handling
         if(n < 0) {
             // Read was unsuccessful
-            throw std::system_error(EFAULT, std::system_category());
+            throw SerialException("Failed to read from serial port");
         }
         else if(n == 0) {
             // n == 0 means EOS, but also returned on device disconnection. We try to get termios2 to distinguish two these two states
@@ -545,7 +561,7 @@ namespace CppLinuxSerial {
             int rv = ioctl(fileDesc_, TCGETS2, &term2);
 
             if(rv != 0) {
-                throw std::system_error(EFAULT, std::system_category());
+                throw SerialException("Device disconnected on read");
             }
         }
         else if(n > 0) {
